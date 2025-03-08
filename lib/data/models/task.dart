@@ -3,14 +3,14 @@ import 'package:todo_list_app/utils/task_category.dart';
 import 'package:todo_list_app/utils/task_keys.dart';
 
 class Task extends Equatable {
-  final int? id;
+  int? id;
   final String title;
   final String note;
   final TaskCategory category;
   final String time;
   final String date;
   final bool isCompleted;
-  const Task({
+  Task({
     this.id,
     required this.title,
     required this.category,
