@@ -46,6 +46,7 @@ class NotificationService {
           importance: Importance.max,
           priority: Priority.high,
           showWhen: false,
+          enableVibration: true,
         );
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
@@ -73,6 +74,8 @@ class NotificationService {
           importance: Importance.max,
           priority: Priority.high,
           showWhen: false,
+          sound: RawResourceAndroidNotificationSound('t1'),
+          enableVibration: true,
         );
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
