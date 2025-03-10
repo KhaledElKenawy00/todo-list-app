@@ -9,22 +9,27 @@ class NotificationService {
     return _notificationService;
   }
   NotificationService._internal();
+
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
   Future<void> initialize() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
+
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
           requestAlertPermission: true,
           requestBadgePermission: true,
           requestSoundPermission: true,
         );
+
     const InitializationSettings initializationSettings =
         InitializationSettings(
           android: initializationSettingsAndroid,
           iOS: initializationSettingsIOS,
         );
+
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: _onTapNotification,
@@ -32,65 +37,98 @@ class NotificationService {
   }
 
   void _onTapNotification(NotificationResponse response) {
-    print(
-      '__________________________________Notification tapped! ${response.payload}____________________________________________________',
-    );
+    print('📢 Notification tapped! ${response.payload}');
   }
 
-  Future<void> showInstanceNotification(String title, String note) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-          'instant_channel',
-          'Instatnt Notification',
-          channelDescription: 'This channel is used for instant notification',
-          importance: Importance.max,
-          priority: Priority.high,
-          showWhen: false,
-          enableVibration: true,
-        );
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-    );
-    //show todo details
-    await flutterLocalNotificationsPlugin.show(
-      0,
-      title,
-      note,
-      platformChannelSpecifics,
-      payload: 'item x',
-    );
-  }
-
+  /// **📌 جدولة إشعار واحد بناءً على التاريخ والوقت المحددين**
   Future<void> scheduleNotification(
+    int id,
     DateTime scheduledDate,
     String title,
     String note,
   ) async {
+    tz.initializeTimeZones();
+
+    final tz.TZDateTime scheduledTZDateTime = tz.TZDateTime.from(
+      scheduledDate,
+      tz.local,
+    );
+
+    if (scheduledTZDateTime.isBefore(tz.TZDateTime.now(tz.local))) {
+      print("❌ التاريخ المحدد قديم، سيتم تخطيه.");
+      return;
+    }
+
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-          'instant_channel',
-          'Instatnt Notification',
-          channelDescription: 'This channel is used for instant notification',
+          'scheduled_channel',
+          'Scheduled Notification',
+          channelDescription:
+              'This channel is used for scheduled notifications',
           importance: Importance.max,
           priority: Priority.high,
-          showWhen: false,
-          sound: RawResourceAndroidNotificationSound('t1'),
+          showWhen: true,
           enableVibration: true,
         );
+
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
     );
-    //show todo details
+
     await flutterLocalNotificationsPlugin.zonedSchedule(
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      1,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+      id, // استخدم ID مختلف لكل إشعار
       title,
       note,
-      tz.TZDateTime.from(scheduledDate, tz.local),
+      scheduledTZDateTime,
       platformChannelSpecifics,
-      payload: 'item x',
+      androidScheduleMode: AndroidScheduleMode.alarmClock,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      payload: 'item_x',
     );
+
+    print("✅ تم جدولة الإشعار رقم $id في ${scheduledDate.toString()}");
+  }
+
+  /// **📌 جدولة إشعارات متعددة بناءً على قائمة من التواريخ والأوقات**
+  Future<void> scheduleMultipleNotifications(List<DateTime> dates) async {
+    tz.initializeTimeZones();
+
+    for (int i = 0; i < dates.length; i++) {
+      final tz.TZDateTime scheduledTZDateTime = tz.TZDateTime.from(
+        dates[i],
+        tz.local,
+      );
+
+      if (scheduledTZDateTime.isBefore(tz.TZDateTime.now(tz.local))) {
+        print("❌ التاريخ المحدد رقم ${i + 1} قديم، سيتم تخطيه.");
+        continue;
+      }
+
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        i + 1, // ID مختلف لكل إشعار
+        'إشعار رقم ${i + 1}',
+        'هذا هو الإشعار المجدول ليوم ${dates[i]}',
+        scheduledTZDateTime,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'scheduled_channel',
+            'Scheduled Notification',
+            channelDescription:
+                'This channel is used for scheduled notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            showWhen: true,
+            enableVibration: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: 'item_x',
+      );
+
+      print("✅ تم جدولة الإشعار رقم ${i + 1} في ${dates[i]}");
+    }
   }
 }

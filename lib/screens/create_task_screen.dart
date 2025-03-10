@@ -31,10 +31,18 @@ class CreateTaskScreen extends ConsumerStatefulWidget {
 class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
-  NotificationService _notificationService = NotificationService();
+  final NotificationService _notificationService = NotificationService();
   DateTime selectedDate = DateTime.now();
   TimeOfDay selectedTime = TimeOfDay.now();
-  Future<void> _scheduleDateTime(String title, String note) async {
+  PermissionStatus _notificationStatus = PermissionStatus.denied;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestAndCheckNotificationPermission();
+  }
+
+  Future<void> _scheduleNotification(String title, String note) async {
     final DateTime scheduledDate = DateTime(
       selectedDate.year,
       selectedDate.month,
@@ -42,6 +50,7 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
       selectedTime.hour,
       selectedTime.minute,
     );
+
     if (scheduledDate.isBefore(DateTime.now())) {
       if (mounted) {
         AppAlerts.displaySnackbar(context, 'Please select a future date');
@@ -49,13 +58,23 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
       return;
     }
 
-    await _notificationService.scheduleNotification(scheduledDate, title, note);
+    /// **📌 جدولة الإشعار مع معرف فريد لكل إشعار**
+    final int notificationId = scheduledDate.millisecondsSinceEpoch.remainder(
+      100000,
+    );
+
+    await _notificationService.scheduleNotification(
+      notificationId,
+      scheduledDate,
+      title,
+      note,
+    );
+
     if (mounted) {
-      AppAlerts.displaySnackbar(context, 'Notification schudeled ');
+      AppAlerts.displaySnackbar(context, 'Notification scheduled');
     }
   }
 
-  PermissionStatus _notificationStatus = PermissionStatus.denied;
   Future<void> _requestAndCheckNotificationPermission() async {
     var status = await Permission.notification.status;
     if (!status.isGranted) {
@@ -73,11 +92,37 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
     await AppSettings.openAppSettings(type: AppSettingsType.notification);
   }
 
-  void updateDateTime(DateTime date, TimeOfDay time) async {
+  void updateDateTime(DateTime date, TimeOfDay time) {
     setState(() {
       selectedDate = date;
       selectedTime = time;
     });
+  }
+
+  void _createTask() async {
+    final title = _titleController.text.trim();
+    final note = _noteController.text.trim();
+    final category = ref.watch(categoryProvider);
+
+    if (title.isNotEmpty) {
+      final task = Task(
+        title: title,
+        category: category,
+        time: Helpers.timeToString(selectedTime),
+        date: DateFormat.yMMMd().format(selectedDate),
+        note: note,
+        isCompleted: false,
+      );
+
+      /// **📌 جدولة الإشعار بعد إضافة المهمة**
+      await ref.read(tasksProvider.notifier).createTask(task).then((value) {
+        _scheduleNotification(title, note);
+        AppAlerts.displaySnackbar(context, 'Task created successfully');
+        context.go(RouteLocation.home);
+      });
+    } else {
+      AppAlerts.displaySnackbar(context, 'Title cannot be empty');
+    }
   }
 
   @override
@@ -85,13 +130,6 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
     _titleController.dispose();
     _noteController.dispose();
     super.dispose();
-  }
-
-  @override
-  void initState() {
-    _requestAndCheckNotificationPermission();
-    // TODO: implement initState
-    super.initState();
   }
 
   @override
@@ -144,29 +182,5 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
         ),
       ),
     );
-  }
-
-  void _createTask() async {
-    final title = _titleController.text.trim();
-    final note = _noteController.text.trim();
-    final category = ref.watch(categoryProvider);
-    if (title.isNotEmpty) {
-      final task = Task(
-        title: title,
-        category: category,
-        time: Helpers.timeToString(selectedTime),
-        date: DateFormat.yMMMd().format(selectedDate),
-        note: note,
-        isCompleted: false,
-      );
-
-      await ref.read(tasksProvider.notifier).createTask(task).then((value) {
-        _scheduleDateTime(title, note);
-        AppAlerts.displaySnackbar(context, 'Task create successfully');
-        context.go(RouteLocation.home);
-      });
-    } else {
-      AppAlerts.displaySnackbar(context, 'Title cannot be empty');
-    }
   }
 }
